@@ -1,0 +1,5 @@
+{
+  "name": "MoStar Data Conduit",
+  "description": "A MoStar-wide data operating layer for data intake, training, generation, evaluation, and delivery fabric.",
+  "requestFramePermissions": []
+}
