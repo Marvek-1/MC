@@ -43,7 +43,41 @@ function Zap(props: any) {
 
 export function SourceConnect() {
   const [selected, setSelected] = useState<string | null>(null);
-  const [step, setStep] = useState<'select' | 'configure' | 'introspect'>('select');
+  const [step, setStep] = useState<'select' | 'configure' | 'introspect' | 'project'>('select');
+
+  const [connectionString, setConnectionString] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [projectErrors, setProjectErrors] = useState<{ name?: string; description?: string }>({});
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ connectionString?: string; username?: string; password?: string }>({});
+
+  const handleTestAndIntrospect = () => {
+    const newErrors: { connectionString?: string; username?: string; password?: string } = {};
+    
+    if (!connectionString.trim()) {
+      newErrors.connectionString = 'Connection string is required';
+    } else if (!connectionString.includes('://') && selected !== 'api' && selected !== 'file') {
+      newErrors.connectionString = 'Must be a valid connection string (e.g., postgres://...)';
+    }
+
+    if (!username.trim() && selected !== 'file') {
+      newErrors.username = 'Username is required';
+    }
+
+    if (!password.trim() && selected !== 'file') {
+      newErrors.password = 'Password is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+    setStep('introspect');
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -102,18 +136,42 @@ export function SourceConnect() {
               <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Connection String / URL</label>
               <input 
                 type="text" 
+                value={connectionString}
+                onChange={(e) => setConnectionString(e.target.value)}
                 placeholder="e.g. postgres://user:pass@host:port/db"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50"
+                className={cn(
+                  "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
+                  errors.connectionString ? "border-red-500" : "border-zinc-800"
+                )}
               />
+              {errors.connectionString && <p className="text-xs text-red-500 mt-1">{errors.connectionString}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Username</label>
-                <input type="text" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 px-4 text-sm" />
+                <input 
+                  type="text" 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className={cn(
+                    "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
+                    errors.username ? "border-red-500" : "border-zinc-800"
+                  )}
+                />
+                {errors.username && <p className="text-xs text-red-500 mt-1">{errors.username}</p>}
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Password</label>
-                <input type="password" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 px-4 text-sm" />
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={cn(
+                    "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
+                    errors.password ? "border-red-500" : "border-zinc-800"
+                  )}
+                />
+                {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
               </div>
             </div>
           </div>
@@ -126,7 +184,7 @@ export function SourceConnect() {
               Cancel
             </button>
             <button 
-              onClick={() => setStep('introspect')}
+              onClick={handleTestAndIntrospect}
               className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-2 rounded-lg font-semibold text-sm transition-colors"
             >
               Test & Introspect
@@ -174,8 +232,83 @@ export function SourceConnect() {
           </div>
 
           <div className="flex justify-end">
-            <button className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-8 py-3 rounded-lg font-bold transition-colors">
-              Continue to Schema Studio
+            <button 
+              onClick={() => setStep('project')}
+              className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-8 py-3 rounded-lg font-bold transition-colors"
+            >
+              Continue to Project Details
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {step === 'project' && (
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 space-y-6"
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <button 
+              onClick={() => setStep('introspect')}
+              className="text-zinc-500 hover:text-zinc-100 text-sm"
+            >
+              ← Back
+            </button>
+            <h3 className="text-lg font-semibold">Project Details</h3>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Project Name</label>
+              <input 
+                type="text" 
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="e.g. Customer Analytics"
+                className={cn(
+                  "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
+                  projectErrors.name ? "border-red-500" : "border-zinc-800"
+                )}
+              />
+              {projectErrors.name && <p className="text-xs text-red-500 mt-1">{projectErrors.name}</p>}
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Description</label>
+              <textarea 
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                placeholder="Briefly describe what this project is for..."
+                rows={4}
+                className={cn(
+                  "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50 resize-none",
+                  projectErrors.description ? "border-red-500" : "border-zinc-800"
+                )}
+              />
+              {projectErrors.description && <p className="text-xs text-red-500 mt-1">{projectErrors.description}</p>}
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-zinc-800 flex justify-end gap-3">
+            <button 
+              onClick={() => {
+                const newErrors: { name?: string; description?: string } = {};
+                if (!projectName.trim()) newErrors.name = 'Project name is required';
+                if (!projectDescription.trim()) newErrors.description = 'Project description is required';
+                
+                if (Object.keys(newErrors).length > 0) {
+                  setProjectErrors(newErrors);
+                  return;
+                }
+                
+                setProjectErrors({});
+                // Proceed to next phase (e.g., Schema Studio)
+                alert('Project created successfully!');
+              }}
+              className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-2 rounded-lg font-semibold text-sm transition-colors"
+            >
+              Create Project
             </button>
           </div>
         </motion.div>

@@ -16,7 +16,8 @@ import { cn } from '@/src/lib/utils';
 const navItems = [
   { name: 'Projects', icon: Box, path: '/' },
   { name: 'Datasets', icon: Database, path: '/datasets' },
-  { name: 'Models', icon: Zap, path: '/models' },
+  { name: 'Training', icon: Zap, path: '/training' },
+  { name: 'Models', icon: Box, path: '/models' },
   { name: 'Scenarios', icon: Activity, path: '/scenarios' },
   { name: 'Evaluations', icon: ShieldCheck, path: '/evaluations' },
   { name: 'Exports', icon: Share2, path: '/exports' },

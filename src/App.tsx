@@ -8,6 +8,7 @@ import { Layout } from './components/Layout';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { SourceConnectPage } from './pages/SourceConnectPage';
+import { TrainingPage } from './pages/TrainingPage';
 import { cn } from './lib/utils';
 
 export default function App() {
@@ -18,8 +19,9 @@ export default function App() {
           <Route path="/" element={<ProjectsPage />} />
           <Route path="/project/:id" element={<ProjectDetailPage />} />
           <Route path="/connect" element={<SourceConnectPage />} />
+          <Route path="/training" element={<TrainingPage />} />
           <Route path="/datasets" element={<div className="text-zinc-500 italic">Datasets module coming soon...</div>} />
-          <Route path="/models" element={<div className="text-zinc-500 italic">Models module coming soon...</div>} />
+          <Route path="/models" element={<TrainingPage />} />
           <Route path="/scenarios" element={<div className="text-zinc-500 italic">Scenarios module coming soon...</div>} />
           <Route path="/evaluations" element={<div className="text-zinc-500 italic">Evaluations module coming soon...</div>} />
           <Route path="/exports" element={<div className="text-zinc-500 italic">Exports module coming soon...</div>} />
