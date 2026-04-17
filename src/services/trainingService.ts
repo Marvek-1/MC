@@ -18,70 +18,36 @@ class TrainingService {
 
     this.jobs.push(job);
 
-    // Simulate training process
-    this.simulateTraining(job.id);
+    // Delegate training to Python backend
+    this.delegateTraining(job.id, params);
 
     return job;
   }
 
-  private async simulateTraining(jobId: string) {
+  private async delegateTraining(jobId: string, params: TrainingParameters) {
     const job = this.jobs.find(j => j.id === jobId);
     if (!job) return;
-
-    // REALITY CHECK: Initialize Holdout Vault
-    // Simulating source data ingestion
-    const mockSourceData = Array.from({ length: 5000 }, (_, i) => ({ id: i, value: Math.random() }));
-    vault.lockHoldout(mockSourceData);
-
-    // Wait in queue
-    await new Promise(resolve => setTimeout(resolve, 2000));
     job.status = 'training';
-    
-    // RECORD PRIVACY BUDGET CONSUMPTION
-    privacyLedger.recordTraining(job.id, 0.5); // Consuming 0.5 epsilon for this run
-
-    const totalSteps = 100;
-    const stepDuration = (job.parameters.maxEpochs / 100) * 500; // Simulate time based on epochs
-
-    for (let i = 0; i <= totalSteps; i++) {
-      await new Promise(resolve => setTimeout(resolve, stepDuration));
-      job.progress = i;
-      
-      // Add some random metrics
-      if (i > 0) {
-        job.metrics = {
-          accuracy: 0.7 + (i / 400) + (Math.random() * 0.05),
-          loss: 0.5 - (i / 250) + (Math.random() * 0.02),
-          trainingSpeed: 150 + (Math.random() * 50),
-        };
+    try {
+      const response = await fetch('http://localhost:8000/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: job.projectId, parameters: params })
+      });
+      if (!response.ok) {
+        job.status = 'error';
+        job.error = `Python worker error: ${response.statusText}`;
+        return;
       }
-    }
-
-    job.status = 'done';
-    job.endTime = new Date().toISOString();
-    
-    // REALITY CHECK: Compute actual Spearman correlation for feature alignment
-    const realSHAP = [0.85, 0.72, 0.45, 0.38, 0.12];
-    const syntheticSHAP = [0.82, 0.68, 0.42, 0.35, 0.15];
-    const spearman = validationService.computeSpearmanCorrelation(realSHAP, syntheticSHAP);
-    const miaAuc = validationService.runMembershipInferenceAttack([], []);
-
-    // Calculate final ML Utility metrics
-    job.metrics = {
-      ...job.metrics,
-      tstrRatio: 0.92 + (Math.random() * 0.06),
-      fidelityScore: 0.88 + (spearman / 10), // Fixed typo: spearman
-      featureImportance: [
-        { name: 'amount', realImpact: 0.85, syntheticImpact: 0.82 },
-        { name: 'frequency', realImpact: 0.72, syntheticImpact: 0.68 },
-        { name: 'location_id', realImpact: 0.45, syntheticImpact: 0.42 },
-        { name: 'user_age', realImpact: 0.38, syntheticImpact: 0.35 },
-        { name: 'device_type', realImpact: 0.12, syntheticImpact: 0.15 },
-      ]
-    };
-
-    if (spearman < 0.85) {
-      console.warn(`Utility Warning: Spearman correlation (${spearman.toFixed(2)}) below threshold.`);
+      const result = await response.json();
+      // Expect result to contain metrics, progress, etc.
+      job.status = result.status || 'done';
+      job.progress = result.progress ?? 100;
+      job.metrics = result.metrics;
+      job.endTime = new Date().toISOString();
+    } catch (err: any) {
+      job.status = 'error';
+      job.error = err.message || 'Unknown error communicating with Python worker';
     }
   }
 
