@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "PoeEngineData": {
+      "title": "Phantom POE Engine Data",
+      "description": "Synthetic operational data for the Phantom POE engine.",
+      "type": "object",
+      "properties": {
+        "engineId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "pressure": { "type": "number" },
+        "temperature": { "type": "number" },
+        "rpm": { "type": "integer" },
+        "status": { "type": "string", "enum": ["stable", "warning", "critical"] },
+        "signalHash": { "type": "string" }
+      },
+      "required": ["engineId", "timestamp", "pressure", "temperature", "rpm", "status"]
+    },
+    "PoeEngineMetadata": {
+      "title": "POE Engine Metadata",
+      "description": "Static configuration and asset details for POE engines.",
+      "type": "object",
+      "properties": {
+        "engineId": { "type": "string" },
+        "modelSeries": { "type": "string" },
+        "commissionDate": { "type": "string", "format": "date" },
+        "firmwareVersion": { "type": "string" },
+        "locationTag": { "type": "string" }
+      },
+      "required": ["engineId", "modelSeries", "commissionDate"]
+    },
+    "PoeMaintenanceRecord": {
+      "title": "POE Maintenance Record",
+      "description": "Historical maintenance and service events.",
+      "type": "object",
+      "properties": {
+        "recordId": { "type": "string" },
+        "engineId": { "type": "string" },
+        "serviceDate": { "type": "string", "format": "date-time" },
+        "technicianId": { "type": "string" },
+        "actionTaken": { "type": "string" },
+        "partsReplaced": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["recordId", "engineId", "serviceDate"]
+    },
+    "PoeFailureEvent": {
+      "title": "POE Failure Event",
+      "description": "Critical failure logs for minority class balancing.",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string" },
+        "engineId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "failureType": { "type": "string" },
+        "severity": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "rootCause": { "type": "string" }
+      },
+      "required": ["eventId", "engineId", "timestamp", "failureType"]
+    }
+  },
+  "firestore": {
+    "/poe_simulations/{simId}/operational_logs/{records}": {
+      "schema": "PoeEngineData",
+      "description": "Detailed operational logs."
+    },
+    "/poe_simulations/{simId}/engine_metadata/{records}": {
+      "schema": "PoeEngineMetadata",
+      "description": "Engine static configurations."
+    },
+    "/poe_simulations/{simId}/maintenance_records/{records}": {
+      "schema": "PoeMaintenanceRecord",
+      "description": "Service history logs."
+    },
+    "/poe_simulations/{simId}/failure_events/{records}": {
+      "schema": "PoeFailureEvent",
+      "description": "High-severity anomaly labels."
+    }
+  }
+}

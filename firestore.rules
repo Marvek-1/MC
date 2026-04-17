@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: poe_simulations/{simId}/data
+    // Fields:
+    //   - engineId: string (required)
+    //   - timestamp: string (required, date-time format)
+    //   - pressure: number (required)
+    //   - temperature: number (required)
+    //   - rpm: int (required)
+    //   - status: string (required, ['stable', 'warning', 'critical'])
+    //   - signalHash: string (optional)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "marvek72@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidPoeData(data) {
+      return data.engineId is string &&
+             data.timestamp is string &&
+             data.pressure is number &&
+             data.temperature is number &&
+             data.rpm is int &&
+             data.status in ['stable', 'warning', 'critical'];
+    }
+
+    function isValidPoeMetadata(data) {
+      return data.engineId is string && data.modelSeries is string && data.commissionDate is string;
+    }
+
+    function isValidPoeMaintenance(data) {
+      return data.recordId is string && data.engineId is string && data.serviceDate is string;
+    }
+
+    function isValidPoeFailure(data) {
+      return data.eventId is string && data.engineId is string && data.timestamp is string && data.failureType is string;
+    }
+
+    match /poe_simulations/{simId}/operational_logs/{recordId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidPoeData(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /poe_simulations/{simId}/engine_metadata/{recordId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidPoeMetadata(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /poe_simulations/{simId}/maintenance_records/{recordId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidPoeMaintenance(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /poe_simulations/{simId}/failure_events/{recordId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidPoeFailure(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId || isAdmin();
+    }
+  }
+}

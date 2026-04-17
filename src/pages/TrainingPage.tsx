@@ -11,22 +11,51 @@ import {
   ChevronRight,
   Database,
   Cpu,
-  BarChart3
+  BarChart3,
+  Download,
+  Zap,
+  FileText,
+  ShieldCheck
 } from 'lucide-react';
 import { trainingService } from '../services/trainingService';
+import { exportService } from '../services/exportService';
+import { privacyLedger } from '../services/privacyLedger';
+import { vault } from '../lib/vault';
 import { TrainingJob, TrainingParameters } from '../types/training';
 import { cn } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
+
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer,
+  Legend,
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis
+} from 'recharts';
 
 export const TrainingPage: React.FC = () => {
-  const [projectId] = useState('default-project'); // In a real app, this would come from context or URL
+  const navigate = useNavigate();
+  const [projectId] = useState('default-project'); 
   const [jobs, setJobs] = useState<TrainingJob[]>([]);
+  const [datasets, setDatasets] = useState<any[]>([]);
   const [isTraining, setIsTraining] = useState(false);
+  const [privacyBudget, setPrivacyBudget] = useState(privacyLedger.getBudget());
+  const [vaultStatus, setVaultStatus] = useState<any>(null);
+  const [activeTabs, setActiveTabs] = useState<Record<string, 'overview' | 'validation'>>({});
   const [params, setParams] = useState<TrainingParameters>({
-    modelType: 'classification',
-    epochs: 10,
-    learningRate: 0.001,
+    model: 'MOSTLY_AI/Medium',
+    maxSampleSize: 100000,
     batchSize: 32,
-    validationSplit: 0.2,
+    maxTrainingTime: 240,
+    maxEpochs: 100,
   });
 
   useEffect(() => {
@@ -34,8 +63,12 @@ export const TrainingPage: React.FC = () => {
       const currentJobs = trainingService.getJobs(projectId);
       setJobs([...currentJobs].reverse());
       
-      const activeJob = currentJobs.find(j => j.status === 'running' || j.status === 'queued');
+      const currentDatasets = exportService.getDatasets(projectId);
+      setDatasets(currentDatasets);
+      
+      const activeJob = currentJobs.find(j => j.status === 'training' || j.status === 'queued');
       setIsTraining(!!activeJob);
+      setPrivacyBudget(privacyLedger.getBudget());
     }, 1000);
 
     return () => clearInterval(interval);
@@ -43,6 +76,14 @@ export const TrainingPage: React.FC = () => {
 
   const handleStartTraining = async () => {
     await trainingService.startTraining(projectId, params);
+  };
+
+  const handleGenerateData = async (jobId: string) => {
+    await exportService.startGeneration(projectId, jobId, {
+      sampleCount: 10000,
+      format: 'csv'
+    });
+    navigate('/exports');
   };
 
   return (
@@ -75,23 +116,25 @@ export const TrainingPage: React.FC = () => {
                 <label className="text-xs font-mono text-zinc-500 uppercase">Model Architecture</label>
                 <select 
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
-                  value={params.modelType}
-                  onChange={(e) => setParams({...params, modelType: e.target.value as any})}
+                  value={params.model}
+                  onChange={(e) => setParams({...params, model: e.target.value as any})}
                 >
-                  <option value="classification">Deep Classification</option>
-                  <option value="regression">Linear Regression</option>
-                  <option value="clustering">K-Means Clustering</option>
+                  <option value="MOSTLY_AI/Small">MOSTLY_AI/Small (Fast)</option>
+                  <option value="MOSTLY_AI/Medium">MOSTLY_AI/Medium (Balanced)</option>
+                  <option value="MOSTLY_AI/Large">MOSTLY_AI/Large (Accurate)</option>
+                  <option value="MOSTLY_AI/LSTMFromScratch-3m">LSTM From Scratch</option>
+                  <option value="microsoft/phi-1_5">Microsoft Phi-1.5 (LLM)</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-mono text-zinc-500 uppercase">Epochs</label>
+                  <label className="text-xs font-mono text-zinc-500 uppercase">Max Epochs</label>
                   <input 
                     type="number" 
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    value={params.epochs}
-                    onChange={(e) => setParams({...params, epochs: parseInt(e.target.value)})}
+                    value={params.maxEpochs}
+                    onChange={(e) => setParams({...params, maxEpochs: parseInt(e.target.value)})}
                   />
                 </div>
                 <div className="space-y-2">
@@ -106,28 +149,25 @@ export const TrainingPage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-mono text-zinc-500 uppercase">Learning Rate: {params.learningRate}</label>
+                <label className="text-xs font-mono text-zinc-500 uppercase">Max Sample Size</label>
                 <input 
-                  type="range" 
-                  min="0.0001" 
-                  max="0.01" 
-                  step="0.0001"
-                  className="w-full accent-emerald-500"
-                  value={params.learningRate}
-                  onChange={(e) => setParams({...params, learningRate: parseFloat(e.target.value)})}
+                  type="number" 
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  value={params.maxSampleSize}
+                  onChange={(e) => setParams({...params, maxSampleSize: parseInt(e.target.value)})}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-mono text-zinc-500 uppercase">Validation Split: {Math.round(params.validationSplit * 100)}%</label>
+                <label className="text-xs font-mono text-zinc-500 uppercase">Max Training Time: {params.maxTrainingTime} min</label>
                 <input 
                   type="range" 
-                  min="0.1" 
-                  max="0.5" 
-                  step="0.05"
+                  min="30" 
+                  max="1440" 
+                  step="30"
                   className="w-full accent-emerald-500"
-                  value={params.validationSplit}
-                  onChange={(e) => setParams({...params, validationSplit: parseFloat(e.target.value)})}
+                  value={params.maxTrainingTime}
+                  onChange={(e) => setParams({...params, maxTrainingTime: parseInt(e.target.value)})}
                 />
               </div>
             </div>
@@ -176,6 +216,25 @@ export const TrainingPage: React.FC = () => {
                   <span className="text-xs font-mono text-zinc-200">{stat.value}</span>
                 </div>
               ))}
+
+              <div className="pt-4 border-t border-zinc-800/50 space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-zinc-400">
+                    <ShieldCheck size={14} className="text-emerald-500" />
+                    <span className="text-xs">Privacy Budget (ε)</span>
+                  </div>
+                  <span className="text-xs font-mono text-emerald-500">{privacyBudget.totalEpsilon.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-zinc-400">
+                    <Zap size={14} className="text-blue-500" />
+                    <span className="text-xs">TSTR Holdout Vault</span>
+                  </div>
+                  <span className="text-[10px] font-mono bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded uppercase">
+                    Locked
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -214,19 +273,19 @@ export const TrainingPage: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "p-2 rounded-lg",
-                          job.status === 'completed' ? "bg-emerald-500/10 text-emerald-500" :
-                          job.status === 'running' ? "bg-blue-500/10 text-blue-500" :
+                          job.status === 'done' ? "bg-emerald-500/10 text-emerald-500" :
+                          job.status === 'training' ? "bg-blue-500/10 text-blue-500" :
                           job.status === 'failed' ? "bg-red-500/10 text-red-500" :
                           "bg-zinc-800 text-zinc-500"
                         )}>
-                          {job.status === 'completed' ? <CheckCircle2 size={18} /> :
-                           job.status === 'running' ? <Loader2 size={18} className="animate-spin" /> :
+                          {job.status === 'done' ? <CheckCircle2 size={18} /> :
+                           job.status === 'training' ? <Loader2 size={18} className="animate-spin" /> :
                            job.status === 'failed' ? <XCircle size={18} /> :
                            <Activity size={18} />}
                         </div>
                         <div>
                           <div className="text-sm font-bold text-zinc-200">Job #{job.id}</div>
-                          <div className="text-[10px] font-mono text-zinc-500 uppercase">{job.parameters.modelType}</div>
+                          <div className="text-[10px] font-mono text-zinc-500 uppercase">{job.parameters.model}</div>
                         </div>
                       </div>
                       <div className="text-right">
@@ -236,47 +295,187 @@ export const TrainingPage: React.FC = () => {
                     </div>
 
                     <div className="p-4 space-y-4">
-                      {/* Progress Bar */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-[10px] font-mono uppercase">
-                          <span className="text-zinc-500">Progress</span>
-                          <span className="text-zinc-300">{job.progress}%</span>
-                        </div>
-                        <div className="h-1.5 bg-zinc-950 rounded-full overflow-hidden">
-                          <motion.div 
+                      {/* Tabs for Completed Jobs */}
+                      {job.status === 'done' && (
+                        <div className="flex gap-4 border-b border-zinc-800/50 mb-4">
+                          <button 
+                            onClick={() => setActiveTabs({ ...activeTabs, [job.id]: 'overview' })}
                             className={cn(
-                              "h-full rounded-full",
-                              job.status === 'completed' ? "bg-emerald-500" : "bg-blue-500"
+                              "pb-2 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2",
+                              (activeTabs[job.id] || 'overview') === 'overview' 
+                                ? "text-emerald-500 border-emerald-500" 
+                                : "text-zinc-500 border-transparent hover:text-zinc-300"
                             )}
-                            initial={{ width: 0 }}
-                            animate={{ width: `${job.progress}%` }}
-                            transition={{ duration: 0.5 }}
-                          />
+                          >
+                            Overview
+                          </button>
+                          <button 
+                            onClick={() => setActiveTabs({ ...activeTabs, [job.id]: 'validation' })}
+                            className={cn(
+                              "pb-2 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2",
+                              activeTabs[job.id] === 'validation' 
+                                ? "text-blue-500 border-blue-500" 
+                                : "text-zinc-500 border-transparent hover:text-zinc-300"
+                            )}
+                          >
+                            ML Validation (TSTR)
+                          </button>
                         </div>
-                      </div>
+                      )}
 
-                      {/* Metrics */}
-                      {job.metrics && (
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                          <div className="bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 space-y-1">
-                            <div className="flex items-center gap-1.5 text-zinc-500">
-                              <BarChart3 size={12} />
-                              <span className="text-[10px] font-mono uppercase">Accuracy</span>
-                            </div>
-                            <div className="text-lg font-bold text-emerald-500">
-                              {(job.metrics.accuracy! * 100).toFixed(2)}%
-                            </div>
+                      {/* Progress Bar (Only show if not done) */}
+                      {job.status !== 'done' && (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-[10px] font-mono uppercase">
+                            <span className="text-zinc-500">Progress</span>
+                            <span className="text-zinc-300">{job.progress}%</span>
                           </div>
-                          <div className="bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 space-y-1">
-                            <div className="flex items-center gap-1.5 text-zinc-500">
-                              <Activity size={12} />
-                              <span className="text-[10px] font-mono uppercase">Loss</span>
-                            </div>
-                            <div className="text-lg font-bold text-zinc-300">
-                              {job.metrics.loss!.toFixed(4)}
-                            </div>
+                          <div className="h-1.5 bg-zinc-950 rounded-full overflow-hidden">
+                            <motion.div 
+                              className={cn(
+                                "h-full rounded-full",
+                                job.status === 'done' ? "bg-emerald-500" : "bg-blue-500"
+                              )}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${job.progress}%` }}
+                              transition={{ duration: 0.5 }}
+                            />
                           </div>
                         </div>
+                      )}
+
+                      {/* Metrics - Overview Tab */}
+                      {job.metrics && (activeTabs[job.id] || 'overview') === 'overview' && (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-3 gap-4 pt-2">
+                            <div className="bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 space-y-1">
+                              <div className="flex items-center gap-1.5 text-zinc-500">
+                                <BarChart3 size={12} />
+                                <span className="text-[10px] font-mono uppercase">Accuracy</span>
+                              </div>
+                              <div className="text-lg font-bold text-emerald-500">
+                                {(job.metrics.accuracy! * 100).toFixed(2)}%
+                              </div>
+                            </div>
+                            <div className="bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 space-y-1">
+                              <div className="flex items-center gap-1.5 text-zinc-500">
+                                <Activity size={12} />
+                                <span className="text-[10px] font-mono uppercase">Loss</span>
+                              </div>
+                              <div className="text-lg font-bold text-zinc-300">
+                                {job.metrics.loss!.toFixed(4)}
+                              </div>
+                            </div>
+                            <div className="bg-zinc-950 border border-zinc-800/50 rounded-lg p-3 space-y-1">
+                              <div className="flex items-center gap-1.5 text-zinc-500">
+                                <Cpu size={12} />
+                                <span className="text-[10px] font-mono uppercase">Speed</span>
+                              </div>
+                              <div className="text-lg font-bold text-blue-400">
+                                {Math.round(job.metrics.trainingSpeed!)} <span className="text-[10px] text-zinc-600 font-normal">s/s</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {job.status === 'done' && (
+                            <button 
+                              onClick={() => {
+                                const existing = datasets.find(d => d.jobId === job.id);
+                                if (existing) {
+                                  navigate('/exports');
+                                } else {
+                                  handleGenerateData(job.id);
+                                }
+                              }}
+                              className={cn(
+                                "w-full py-3 border rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all group",
+                                datasets.find(d => d.jobId === job.id)
+                                  ? "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20"
+                                  : "bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400"
+                              )}
+                            >
+                              {datasets.find(d => d.jobId === job.id) ? (
+                                <>
+                                  <FileText size={14} />
+                                  View Synthetic Export
+                                </>
+                              ) : (
+                                <>
+                                  <Zap size={14} className="group-hover:scale-110 transition-transform" />
+                                  Generate Synthetic Data
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ML Validation Tab */}
+                      {job.status === 'done' && activeTabs[job.id] === 'validation' && (
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="space-y-6 animate-in fade-in duration-500"
+                        >
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl space-y-2">
+                              <div className="text-[10px] text-zinc-500 uppercase font-mono flex items-center gap-2">
+                                <Zap size={10} className="text-blue-400" />
+                                ML Utility Score (TSTR)
+                              </div>
+                              <div className="text-3xl font-bold text-blue-400">
+                                {(job.metrics?.tstrRatio! * 100).toFixed(1)}%
+                              </div>
+                              <p className="text-[10px] text-zinc-600 leading-tight">
+                                This captures how much model performance is retained when switching from real to synthetic training data.
+                              </p>
+                            </div>
+                            <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl space-y-2">
+                              <div className="text-[10px] text-zinc-500 uppercase font-mono flex items-center gap-2">
+                                <ShieldCheck size={10} className="text-emerald-500" />
+                                Fidelity Retention
+                              </div>
+                              <div className="text-3xl font-bold text-emerald-500">
+                                {(job.metrics?.fidelityScore! * 100).toFixed(1)}%
+                              </div>
+                              <p className="text-[10px] text-zinc-600 leading-tight">
+                                High fidelity indicates that multivariate distributions are preserved across the entire schema.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 border-b border-zinc-800 pb-2">
+                              Feature Importance Alignment
+                            </h4>
+                            <div className="h-[200px] w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={job.metrics?.featureImportance}
+                                  layout="vertical"
+                                  margin={{ left: -20, right: 20 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
+                                  <XAxis type="number" hide />
+                                  <YAxis 
+                                    dataKey="name" 
+                                    type="category" 
+                                    stroke="#71717a" 
+                                    fontSize={10} 
+                                    width={80}
+                                  />
+                                  <RechartsTooltip 
+                                    contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a' }}
+                                    itemStyle={{ fontSize: '10px' }}
+                                  />
+                                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                                  <Bar name="Real Data" dataKey="realImpact" fill="#3f3f46" radius={[0, 4, 4, 0]} />
+                                  <Bar name="Synthetic Data" dataKey="syntheticImpact" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        </motion.div>
                       )}
                     </div>
                   </motion.div>

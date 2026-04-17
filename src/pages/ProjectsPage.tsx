@@ -77,8 +77,14 @@ export function ProjectsPage() {
               {project.description}
             </p>
             
-            <div className="mt-6 pt-6 border-t border-zinc-800 flex items-center justify-between text-sm">
-              <div className="flex items-center gap-4 text-zinc-400">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(project.name.includes('POE') ? `/dataset/${project.id}` : `/project/${project.id}`);
+              }}
+              className="mt-6 pt-6 border-t border-zinc-800 flex items-center justify-between text-sm w-full group/btn"
+            >
+              <div className="flex items-center gap-4 text-zinc-400 group-hover/btn:text-emerald-400">
                 <div className="flex items-center gap-1">
                   <Database className="w-3 h-3" />
                   <span>{project.datasetCount}</span>
@@ -89,7 +95,7 @@ export function ProjectsPage() {
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
-            </div>
+            </button>
           </motion.div>
         ))}
       </div>

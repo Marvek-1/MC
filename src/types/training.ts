@@ -1,15 +1,18 @@
+export type MostlyModel = 'MOSTLY_AI/Small' | 'MOSTLY_AI/Medium' | 'MOSTLY_AI/Large' | 'MOSTLY_AI/LSTMFromScratch-3m' | 'microsoft/phi-1_5';
+
 export interface TrainingParameters {
-  modelType: 'classification' | 'regression' | 'clustering';
-  epochs: number;
-  learningRate: number;
-  batchSize: number;
-  validationSplit: number;
+  model: MostlyModel;
+  maxSampleSize?: number;
+  batchSize?: number;
+  gradientAccumulationSteps?: number;
+  maxTrainingTime: number; // in minutes
+  maxEpochs: number;
 }
 
 export interface TrainingJob {
   id: string;
   projectId: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: 'new' | 'queued' | 'training' | 'done' | 'failed';
   progress: number;
   parameters: TrainingParameters;
   startTime: string;
@@ -17,5 +20,13 @@ export interface TrainingJob {
   metrics?: {
     accuracy?: number;
     loss?: number;
+    trainingSpeed?: number; // samples/sec
+    tstrRatio?: number; // Train on Synthetic, Test on Real
+    fidelityScore?: number;
+    featureImportance?: {
+      name: string;
+      realImpact: number;
+      syntheticImpact: number;
+    }[];
   };
 }
