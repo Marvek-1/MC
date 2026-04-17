@@ -5,6 +5,10 @@ export function Header() {
   return (
     <header className="h-16 border-b border-zinc-800 bg-zinc-950/50 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-10">
       <div className="flex items-center gap-4 flex-1 max-w-xl">
+        <div className="flex items-center gap-3 px-3 py-1 bg-zinc-900 rounded border border-zinc-800 text-xs font-mono text-zinc-400 mr-4">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>DCX001</span>
+        </div>
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <input 
@@ -14,6 +18,7 @@ export function Header() {
           />
         </div>
       </div>
+
       
       <div className="flex items-center gap-4">
         <button className="p-2 text-zinc-400 hover:text-zinc-100 transition-colors">

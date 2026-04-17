@@ -8,12 +8,14 @@
       try {
         const originalFetch = window.fetch;
         Object.defineProperty(window, 'fetch', {
-          value: originalFetch,
-          writable: true,
+          get: function() { return originalFetch; },
+          set: function(val) { 
+            console.warn('Intercepted window.fetch assignment to avoid getter error'); 
+          },
           configurable: true
         });
       } catch (e) {
-        console.warn('Could not make window.fetch writable', e);
+        console.warn('Could not intercept window.fetch', e);
       }
     </script>
   </head>

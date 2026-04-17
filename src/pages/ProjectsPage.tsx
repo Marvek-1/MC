@@ -1,38 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Database, ArrowRight, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
 
-const mockProjects = [
-  {
-    id: '1',
-    name: 'Phantom POE Simulation',
-    description: 'Synthetic operational data for Phantom POE engine testing.',
-    datasetCount: 4,
-    lastActive: '2 hours ago',
-    status: 'active'
-  },
-  {
-    id: '2',
-    name: 'MoStar Grid Analytics',
-    description: 'Grid signal generation and spatial-aware datasets.',
-    datasetCount: 12,
-    lastActive: '1 day ago',
-    status: 'idle'
-  },
-  {
-    id: '3',
-    name: 'Afro Sentinel Flow',
-    description: 'Temporal event streams for sentinel-related flows.',
-    datasetCount: 7,
-    lastActive: '3 days ago',
-    status: 'active'
-  }
-];
-
 export function ProjectsPage() {
   const navigate = useNavigate();
+  const [projects, setProjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => setProjects(data))
+      .catch(err => console.error('Failed to load projects', err));
+  }, []);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -50,7 +32,7 @@ export function ProjectsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {mockProjects.map((project, index) => (
+        {projects.map((project, index) => (
           <motion.div
             key={project.id}
             initial={{ opacity: 0, y: 20 }}
@@ -80,7 +62,8 @@ export function ProjectsPage() {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(project.name.includes('POE') ? `/dataset/${project.id}` : `/project/${project.id}`);
+                // Instead of jumping directly to dataset, let's jump to the project dashboard
+                navigate(`/project/${project.id}`);
               }}
               className="mt-6 pt-6 border-t border-zinc-800 flex items-center justify-between text-sm w-full group/btn"
             >

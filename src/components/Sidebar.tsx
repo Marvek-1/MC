@@ -69,13 +69,6 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-
-      <div className="p-4 border-t border-zinc-800">
-        <div className="flex items-center gap-3 px-3 py-2 text-sm text-zinc-500">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Sigil: DCX001</span>
-        </div>
-      </div>
     </aside>
   );
 }

@@ -20,7 +20,7 @@ import { cn } from '@/src/lib/utils';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
-type TableType = 'operational_logs' | 'engine_metadata' | 'maintenance_records' | 'failure_events';
+type TableType = string;
 
 interface TableMeta {
   id: TableType;
@@ -30,7 +30,7 @@ interface TableMeta {
   columns: { key: string; label: string; type: 'string' | 'number' | 'date' | 'status' | 'hash'; align?: 'left' | 'right' }[];
 }
 
-const TABLES: TableMeta[] = [
+const POE_TABLES: TableMeta[] = [
   {
     id: 'operational_logs',
     name: 'Operational Logs',
@@ -88,15 +88,61 @@ const TABLES: TableMeta[] = [
   }
 ];
 
+const KAGGLE_TABLES: TableMeta[] = [
+  {
+    id: 'train_csv',
+    name: 'train.csv',
+    icon: FileText,
+    sqlName: 'kaggle_ieee_fraud_train',
+    columns: [
+      { key: 'TransactionID', label: 'TransactionID', type: 'number', align: 'left' },
+      { key: 'isFraud', label: 'isFraud', type: 'number', align: 'right' },
+      { key: 'TransactionDT', label: 'TransactionDT', type: 'number', align: 'right' },
+      { key: 'TransactionAmt', label: 'TransactionAmt', type: 'number', align: 'right' },
+      { key: 'ProductCD', label: 'ProductCD', type: 'string' },
+      { key: 'card1', label: 'card1', type: 'number', align: 'right' },
+      { key: 'P_emaildomain', label: 'P_emaildomain', type: 'string' }
+    ]
+  },
+  {
+    id: 'test_csv',
+    name: 'test.csv',
+    icon: FileText,
+    sqlName: 'kaggle_ieee_fraud_test',
+    columns: [
+      { key: 'TransactionID', label: 'TransactionID', type: 'number', align: 'left' },
+      { key: 'TransactionDT', label: 'TransactionDT', type: 'number', align: 'right' },
+      { key: 'TransactionAmt', label: 'TransactionAmt', type: 'number', align: 'right' },
+      { key: 'ProductCD', label: 'ProductCD', type: 'string' },
+      { key: 'card1', label: 'card1', type: 'number', align: 'right' },
+      { key: 'P_emaildomain', label: 'P_emaildomain', type: 'string' }
+    ]
+  },
+  {
+    id: 'sample_submission_csv',
+    name: 'sample_submission.csv',
+    icon: FileText,
+    sqlName: 'kaggle_ieee_fraud_submission',
+    columns: [
+      { key: 'TransactionID', label: 'TransactionID', type: 'number', align: 'left' },
+      { key: 'isFraud', label: 'isFraud', type: 'number', align: 'right' }
+    ]
+  }
+];
+
 export function DatasetPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTable, setActiveTable] = useState<TableType>('operational_logs');
+  
+  const isKaggle = id?.startsWith('KAG');
+  const activeTables = isKaggle ? KAGGLE_TABLES : POE_TABLES;
+
+  const [activeTable, setActiveTable] = useState<TableType>(activeTables[0].id);
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const currentTable = TABLES.find(t => t.id === activeTable)!;
+  const currentTable = activeTables.find(t => t.id === activeTable)!;
 
   useEffect(() => {
     setLoading(true);
@@ -115,13 +161,13 @@ export function DatasetPage() {
     }, (error) => {
       console.error("Firestore Error:", error);
       // Generate realistic mock data based on table type
-      const mockData = generateMockData(activeTable);
+      const mockData = isKaggle ? generateKaggleMockData(activeTable) : generateMockData(activeTable);
       setRecords(mockData);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [id, activeTable]);
+  }, [id, activeTable, isKaggle]);
 
   function generateMockData(type: TableType): any[] {
     return Array.from({ length: 15 }, (_, i) => {
@@ -169,6 +215,42 @@ export function DatasetPage() {
     });
   }
 
+  function generateKaggleMockData(type: TableType): any[] {
+    return Array.from({ length: 15 }, (_, i) => {
+      const txId = 2987000 + i;
+      switch(type) {
+        case 'train_csv':
+          return {
+            id: `row_${i}`,
+            TransactionID: txId,
+            isFraud: i % 12 === 0 ? 1 : 0,
+            TransactionDT: 86400 + (i * 3500),
+            TransactionAmt: (25 + Math.random() * 150).toFixed(2),
+            ProductCD: i % 4 === 0 ? 'H' : 'W',
+            card1: 10000 + Math.floor(Math.random() * 5000),
+            P_emaildomain: i % 3 === 0 ? 'gmail.com' : 'yahoo.com'
+          };
+        case 'test_csv':
+          return {
+            id: `row_${i}`,
+            TransactionID: 3663549 + i,
+            TransactionDT: 15811131 + (i * 3500),
+            TransactionAmt: (25 + Math.random() * 150).toFixed(2),
+            ProductCD: i % 4 === 0 ? 'H' : 'W',
+            card1: 10000 + Math.floor(Math.random() * 5000),
+            P_emaildomain: i % 3 === 0 ? 'gmail.com' : 'yahoo.com'
+          };
+        case 'sample_submission_csv':
+          return {
+            id: `row_${i}`,
+            TransactionID: 3663549 + i,
+            isFraud: 0.5
+          };
+        default: return {};
+      }
+    });
+  }
+
   const filteredRecords = records.filter(r => 
     Object.values(r).some(val => 
       String(val).toLowerCase().includes(searchTerm.toLowerCase())
@@ -181,16 +263,16 @@ export function DatasetPage() {
       <div className="w-64 flex flex-col gap-2">
         <div className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-zinc-500 uppercase tracking-widest bg-zinc-900/50 rounded-lg">
           <Database size={14} />
-          Scheme Tables
+          {isKaggle ? 'Dataset Files' : 'Scheme Tables'}
         </div>
-        {TABLES.map((table) => (
+        {activeTables.map((table) => (
           <button
             key={table.id}
             onClick={() => setActiveTable(table.id)}
             className={cn(
               "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
               activeTable === table.id 
-                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                ? (isKaggle ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20")
                 : "text-zinc-500 hover:bg-zinc-900 border border-transparent"
             )}
           >
@@ -313,8 +395,8 @@ export function DatasetPage() {
             </div>
             <div className="flex gap-3">
               <div className="flex items-center gap-1">
-                <span className="text-emerald-500">Live Connection</span>
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className={isKaggle ? "text-blue-500" : "text-emerald-500"}>Live Connection</span>
+                <div className={cn("w-2 h-2 rounded-full animate-pulse", isKaggle ? "bg-blue-500" : "bg-emerald-500")} />
               </div>
             </div>
           </div>

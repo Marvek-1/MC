@@ -8,16 +8,20 @@ import {
   CheckCircle2, 
   AlertCircle,
   ChevronRight,
-  Shield
+  Shield,
+  Search,
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
+import { kaggleService, KaggleDatasetMeta } from '../services/kaggleService';
 
 const connectors = [
+  { id: 'kaggle', name: 'Kaggle Dataset', icon: Search, color: 'text-blue-400', description: 'Real-world datasets for benchmarking' },
   { id: 'firebase', name: 'Firebase / Firestore', icon: Cloud, color: 'text-orange-500', description: 'NoSQL document store' },
   { id: 'postgres', name: 'Postgres / Neon', icon: Database, color: 'text-blue-500', description: 'Relational SQL database' },
-  { id: 'supabase', name: 'Supabase', icon: Zap, color: 'text-emerald-500', description: 'Open source Firebase alternative' },
-  { id: 'neo4j', name: 'Neo4j', icon: Globe, color: 'text-blue-400', description: 'Graph database' },
   { id: 'file', name: 'File Upload', icon: FileText, color: 'text-zinc-400', description: 'CSV, JSON, Parquet' },
   { id: 'api', name: 'REST API', icon: LinkIcon, color: 'text-purple-500', description: 'External endpoints' },
 ];
@@ -42,10 +46,15 @@ function Zap(props: any) {
 }
 
 export function SourceConnect() {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<string | null>(null);
   const [step, setStep] = useState<'select' | 'configure' | 'introspect' | 'project'>('select');
 
   const [connectionString, setConnectionString] = useState('');
+  const [kaggleUrl, setKaggleUrl] = useState('');
+  const [kaggleMeta, setKaggleMeta] = useState<KaggleDatasetMeta | null>(null);
+  const [isIntrospecting, setIsIntrospecting] = useState(false);
+  
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [projectErrors, setProjectErrors] = useState<{ name?: string; description?: string }>({});
@@ -54,6 +63,11 @@ export function SourceConnect() {
   const [errors, setErrors] = useState<{ connectionString?: string; username?: string; password?: string }>({});
 
   const handleTestAndIntrospect = () => {
+    if (selected === 'kaggle') {
+      handleKaggleIntrospect();
+      return;
+    }
+
     const newErrors: { connectionString?: string; username?: string; password?: string } = {};
     
     if (!connectionString.trim()) {
@@ -77,6 +91,28 @@ export function SourceConnect() {
 
     setErrors({});
     setStep('introspect');
+  };
+
+  const handleKaggleIntrospect = async () => {
+    if (!kaggleUrl.includes('kaggle.com/datasets/')) {
+      setErrors({ connectionString: 'Please enter a valid Kaggle Dataset URL' });
+      return;
+    }
+
+    setIsIntrospecting(true);
+    setErrors({});
+
+    try {
+      const meta = await kaggleService.introspect(kaggleUrl);
+      setKaggleMeta(meta);
+      setProjectName(`Kaggle: ${meta.slug.split('/')[1]}`);
+      setProjectDescription(`Mirror of Kaggle dataset ${meta.slug}. Content Hash: ${meta.contentHash}`);
+      setStep('introspect');
+    } catch (err: any) {
+      setErrors({ connectionString: err.message });
+    } finally {
+      setIsIntrospecting(false);
+    }
   };
 
   return (
@@ -132,48 +168,74 @@ export function SourceConnect() {
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Connection String / URL</label>
-              <input 
-                type="text" 
-                value={connectionString}
-                onChange={(e) => setConnectionString(e.target.value)}
-                placeholder="e.g. postgres://user:pass@host:port/db"
-                className={cn(
-                  "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
-                  errors.connectionString ? "border-red-500" : "border-zinc-800"
-                )}
-              />
-              {errors.connectionString && <p className="text-xs text-red-500 mt-1">{errors.connectionString}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            {selected === 'kaggle' ? (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Username</label>
-                <input 
-                  type="text" 
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={cn(
-                    "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
-                    errors.username ? "border-red-500" : "border-zinc-800"
-                  )}
-                />
-                {errors.username && <p className="text-xs text-red-500 mt-1">{errors.username}</p>}
+                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Kaggle Dataset URL</label>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <input 
+                    type="text" 
+                    value={kaggleUrl}
+                    onChange={(e) => setKaggleUrl(e.target.value)}
+                    placeholder="https://www.kaggle.com/datasets/username/dataset-name"
+                    className={cn(
+                      "w-full bg-zinc-950 border rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500/50",
+                      errors.connectionString ? "border-red-500" : "border-zinc-800"
+                    )}
+                  />
+                </div>
+                {errors.connectionString && <p className="text-xs text-red-500 mt-1">{errors.connectionString}</p>}
+                <p className="text-[10px] text-zinc-500 mt-2 flex items-center gap-1">
+                  <Shield size={10} />
+                  Authenticated via KAGGLE_API_TOKEN environment variable.
+                </p>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Password</label>
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={cn(
-                    "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
-                    errors.password ? "border-red-500" : "border-zinc-800"
-                  )}
-                />
-                {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Connection String / URL</label>
+                  <input 
+                    type="text" 
+                    value={connectionString}
+                    onChange={(e) => setConnectionString(e.target.value)}
+                    placeholder="e.g. postgres://user:pass@host:port/db"
+                    className={cn(
+                      "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
+                      errors.connectionString ? "border-red-500" : "border-zinc-800"
+                    )}
+                  />
+                  {errors.connectionString && <p className="text-xs text-red-500 mt-1">{errors.connectionString}</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Username</label>
+                    <input 
+                      type="text" 
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className={cn(
+                        "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
+                        errors.username ? "border-red-500" : "border-zinc-800"
+                      )}
+                    />
+                    {errors.username && <p className="text-xs text-red-500 mt-1">{errors.username}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Password</label>
+                    <input 
+                      type="password" 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={cn(
+                        "w-full bg-zinc-950 border rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-emerald-500/50",
+                        errors.password ? "border-red-500" : "border-zinc-800"
+                      )}
+                    />
+                    {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="pt-6 border-t border-zinc-800 flex justify-end gap-3">
@@ -185,9 +247,21 @@ export function SourceConnect() {
             </button>
             <button 
               onClick={handleTestAndIntrospect}
-              className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-2 rounded-lg font-semibold text-sm transition-colors"
+              disabled={isIntrospecting}
+              className={cn(
+                "bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2",
+                isIntrospecting && "opacity-50 cursor-not-allowed",
+                selected === 'kaggle' && "bg-blue-500 hover:bg-blue-400"
+              )}
             >
-              Test & Introspect
+              {isIntrospecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Introspecting...
+                </>
+              ) : (
+                'Test & Introspect'
+              )}
             </button>
           </div>
         </motion.div>
@@ -199,37 +273,82 @@ export function SourceConnect() {
           animate={{ opacity: 1, scale: 1 }}
           className="space-y-6"
         >
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex items-center gap-3 text-emerald-400">
+          <div className={cn(
+            "border rounded-xl p-4 flex items-center gap-3",
+            selected === 'kaggle' ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+          )}>
             <CheckCircle2 className="w-5 h-5" />
-            <span className="text-sm font-medium">Connection successful. Introspecting schema...</span>
+            <span className="text-sm font-medium">
+              {selected === 'kaggle' ? `Fetched Kaggle Metadata for ${kaggleMeta?.slug}` : 'Connection successful. Introspecting schema...'}
+            </span>
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="p-4 bg-zinc-800/50 border-b border-zinc-800 flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Detected Entities (4)</h3>
-              <span className="text-[10px] bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded uppercase font-bold">Postgres</span>
+              <h3 className="font-semibold text-sm">
+                {selected === 'kaggle' ? `Available Files (${kaggleMeta?.files.length})` : 'Detected Entities (4)'}
+              </h3>
+              <span className="text-[10px] bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded uppercase font-bold">
+                {selected === 'kaggle' ? 'Kaggle Cache' : 'Postgres'}
+              </span>
             </div>
             <div className="divide-y divide-zinc-800">
-              {['users', 'transactions', 'signals', 'alerts'].map((entity) => (
-                <div key={entity} className="p-4 flex items-center justify-between hover:bg-zinc-800/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-zinc-950 rounded flex items-center justify-center text-zinc-500">
-                      <Database className="w-4 h-4" />
+              {selected === 'kaggle' ? (
+                kaggleMeta?.files.map((file) => (
+                  <div key={file.name} className="p-4 flex items-center justify-between hover:bg-zinc-800/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-zinc-950 rounded flex items-center justify-center text-blue-500">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-zinc-100">{file.name}</div>
+                        <div className="text-[10px] text-zinc-500">{file.size} • {file.rows.toLocaleString()} records</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-sm font-medium text-zinc-100">{entity}</div>
-                      <div className="text-[10px] text-zinc-500">12 fields • 4.2k records</div>
+                    {file.name === kaggleMeta.suggestedFile && (
+                      <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30 font-bold uppercase">
+                        Primary Source
+                      </span>
+                    )}
+                  </div>
+                ))
+              ) : (
+                ['users', 'transactions', 'signals', 'alerts'].map((entity) => (
+                  <div key={entity} className="p-4 flex items-center justify-between hover:bg-zinc-800/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-zinc-950 rounded flex items-center justify-center text-zinc-500">
+                        <Database className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-zinc-100">{entity}</div>
+                        <div className="text-[10px] text-zinc-500">12 fields • 4.2k records</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-3 h-3 text-amber-500" />
+                      <span className="text-[10px] text-amber-500 font-medium uppercase">PII Detected</span>
+                      <ChevronRight className="w-4 h-4 text-zinc-700 ml-2" />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-3 h-3 text-amber-500" />
-                    <span className="text-[10px] text-amber-500 font-medium uppercase">PII Detected</span>
-                    <ChevronRight className="w-4 h-4 text-zinc-700 ml-2" />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
+
+          {selected === 'kaggle' && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-start gap-4">
+              <div className="p-3 bg-zinc-950 rounded-lg text-blue-400">
+                <ExternalLink className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">Content Fingerprint Verification</h4>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  The dataset's content hash <code className="text-blue-400 text-[10px]">{kaggleMeta?.contentHash}</code> has been mapped for reproducibility. 
+                  Benchmark Mode will utilize this for utility score calibration.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end">
             <button 
@@ -303,8 +422,11 @@ export function SourceConnect() {
                 }
                 
                 setProjectErrors({});
-                // Proceed to next phase (e.g., Schema Studio)
-                alert('Project created successfully!');
+                if (selected === 'kaggle') {
+                  navigate(`/project/KAG-${kaggleMeta?.slug.split('/')[1]}`);
+                } else {
+                  alert('Project created successfully!');
+                }
               }}
               className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-2 rounded-lg font-semibold text-sm transition-colors"
             >
